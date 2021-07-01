@@ -1,0 +1,248 @@
+---
+title: "Risk Prediction of Diabetes at Early Stage using Logistic Regression and Naive Bayes Algorithms"
+author: "Rajeev Agrawal"
+date: "6/14/2021"
+output: 
+  pdf_document:
+    extra_dependencies: "subfig"
+fontsize: 12pt
+geometry: margin=1in
+header-includes:
+   - \usepackage{setspace}\doublespacing
+   - \usepackage{float}
+fig_caption: yes
+indent: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE)
+library(tidyverse)
+library(mosaic)
+library(ggthemes)
+library(gridExtra)
+library(car)
+library(performanceEstimation)
+library(InformationValue)
+library(pROC)
+library(e1071)
+
+diabetes <- read_csv("../data/diabetes_data_upload.csv",
+                     col_types = "nffffffffffffffff")
+
+diabetes <- diabetes %>%
+  rename(sudden_weight_loss = `sudden weight loss`,
+         Genital_thrush = `Genital thrush`,
+         visual_blurring = `visual blurring`,
+         delayed_healing = `delayed healing`,
+         partial_paresis = `partial paresis`,
+         muscle_stiffness = `muscle stiffness`)
+
+#Recode values for our class from Positive/Negative to 1/0.
+diabetes <- diabetes %>%
+  mutate(class = as.factor(if_else(class == "Positive",1,0)))
+```
+
+\pagebreak
+
+## 1. Introduction
+
+Diabetes is a metabolic disorder in which the patient experiences high blood sugar levels over a prolonged period. According to the World Health Organization (WHO), diabetes is one of the fastest growing chronic diseases that has affected hundreds of millions of people worldwide [1]. If left untreated, diabetes may cause serious long-term complications such as cardiovascular disease, stroke, kidney failure, foot ulcers, and blindness. Due to the presence of a relatively long asymptomatic phase, early detection of diabetes is very important for a clinically meaningful outcome and keeping people with diabetes healthy. 
+
+_1.1 Research Question_
+
+The current study builds prediction models using logistic regression and naive Bayes algorithms to predict the risk of diabetes at an early stage.
+
+_1.2 Data_
+
+For this study, the data set containing sign and symptom data of newly diabetic or would be diabetic patients [2] collected by Sylhet Diabetes Hospital in Sylhet, Bangladesh, is used to build the prediction models. The data set contains total 520 records with the following 17 variables (16 of which are predictor variables and one outcome variable - _class_):
+
+* **Categorical variables**
+  + *Gender:* Male or Female.
+  + *Polyuria:* (excessive or an abnormally large production or passage of urine) Yes or No.
+  + *Polydipsia:* (excessive thirst or excess drinking) Yes or No.
+  + *sudden_weight_loss:* Yes or No.
+  + *weakness:* Yes or No.
+  + *Polyphagia:* (abnormally strong sensation of hunger or desire to eat) Yes or No.
+  + *Genital_thrush:* (a fungal infection caused by Candida yeasts) Yes or No.
+  + *visual_blurring:* Yes or No.
+  + *Itching:* Yes or No.
+  + *Irritability:* Yes or No. 
+  + *delayed_healing:* Yes or No.
+  + *partial_paresis:* (partial paralysis) Yes or No.
+  + *muscle_stiffness:* Yes or No.
+  + *Alopecia:* (hair loss) Yes or No.
+  + *Obesity:* Yes or No.
+  + *class:* (patient's diabetes diagnosis) 1 = Positive or 0 = Negative.
+* **Quantitative variables**
+  + *Age:* Patient's age.
+
+_1.3 Literature Review_
+
+The research article by M. M. Faniqul Islam et al. [2] makes predictions about the likelihood of diabetes at early stage using data mining classification methods such as naive Bayes, logistic regression, and random forest. The data set used in their work was collected using direct questionnaires from the patients of Sylhet Diabetes Hospital in Sylhet, Bangladesh. This is the same data set that is also used in the current study.
+
+\singlespacing
+
+## 2. Exploratory Data Analysis
+
+There are no missing values in the data set. 
+
+```{r eda, out.height="35%", fig.align='center'}
+diabetes %>%
+  summary()
+
+diabetes %>%
+  ggplot() + geom_boxplot(aes(Age), color = "blue", fill = "skyblue") +
+  theme_bw()
+```
+
+## 3. Binomial Logistic Regression Model
+
+### Assumptions
+
+1. Binary logistic regression requires the dependent variable to be binary.
+2. The observations are independent of each other.
+3. There is no severe multicollinearity among the explanatory variables.
+4. There are no extreme outliers.
+5. The independent variables are linearly related to the log odds.
+6. The sample size of the dataset is large enough to draw valid conclusions from the fitted logistic regression model.
+
+Out of the above 6 assumptions, the 3rd assumption about multicollinearity will be tested using variance inflation factor (VIF). We will remove the outliers from our data to take care of the 4th assumption. There is no evidence to suggest that the remaining 4 assumptions are violated.
+
+### Dealing with Outliers
+
+We remove the 4 outliers for Age from our data.
+
+```{r logistic}
+d1 <- diabetes %>%
+  filter(Age < 84) 
+```
+
+### Splitting the Data
+
+We partition our data into training and test data sets using 75% to 25% split.
+
+```{r}
+set.seed(1234)
+sample_set <- sample(nrow(d1), round(nrow(d1)*.75), replace = FALSE)
+d1_train <- d1[sample_set, ]
+d1_test <- d1[-sample_set, ]
+```
+
+### Dealing with Class Imbalance
+
+We see that the class distributions across the three sets are similar. The test data should mirror the class distribution of the original data because a model's performance against the test data is a proxy for its generalizability against unseen data. However, any imbalance in the training data is balanced prior to the modeling process. 
+
+```{r}
+#Splitting the data
+round(prop.table(table(select(d1, class))),4)*100
+round(prop.table(table(select(d1_train, class))),4)*100
+round(prop.table(table(select(d1_test, class))),4)*100
+
+#Balance the training data
+set.seed(1234)
+d1_train <- smote(class ~ ., data.frame(d1_train), perc.over = 1, perc.under = 2)
+round(prop.table(table(select(d1_train, class))),4)*100
+```
+
+### Training and Evaluating the Model
+
+We see that based on the p-values, some of the features in this full model are not significant.
+
+```{r}
+d1_model <- glm(d1_train, family = binomial, formula = class ~.)
+summary(d1_model)
+```
+
+### Performing Stepwise Variable Selection
+
+We perform stepwise variable selection based on full model and as can be seen, the variables - _sudden_weight_loss, delayed_healing, partial_paresis and Obesity_ are dropped from the original full model. When comparing two models, the model with the lower AIC is preferred. We can see that the AIC of the new model (= 221.08) is slightly lower than the original full model's AIC of 226.56.
+
+```{r}
+#Step-wise Regression: AIC
+step_model <- step(object = d1_model, trace = FALSE)
+summary(step_model)
+```
+
+### Dealing with Multicollinearity
+
+Multicollinearity is a problem because it makes it difficult to separate out the impact of individual predictors on response. A VIF of greater than 5 indicates the presence of multicollinearity and requires remediation. Our results show that none of the features have a VIF larger than 5.
+
+```{r}
+vif(step_model)
+```
+
+### Choosing a Cutoff Value
+
+```{r}
+d1_predl <- predict(step_model, d1_test, type = "response")
+
+#Choosing a Cutoff Value
+ideal_cutoff <- optimalCutoff(
+  actuals = d1_test$class,
+  predictedScores = d1_predl,
+  optimiseFor = "Both")
+ideal_cutoff
+```
+
+### Prediction Accuracy
+
+Using the recommended cutoff value of `r round(ideal_cutoff, 2)`, we transform our predictions and calculate our model predictive accuracy. Results show that logistic regression model's predictive accuracy is 93.8%.
+
+```{r}
+d1_predl <- if_else(d1_predl >= ideal_cutoff, 1, 0)
+d1_predl_table <- table(d1_test$class, d1_predl)
+d1_predl_table
+
+sum(diag(d1_predl_table))/nrow(d1_test)
+```
+
+## 4. Naive Bayes Classifier
+
+### Building and Evaluating the Model
+
+Results show that naive Bayes classifier's predictive accuracy is 83.7%.
+
+```{r}
+#Building the naive Bayes model
+d2_model <- naiveBayes(class ~., data = d1_train, laplace = 1)
+
+#Evaluating the model
+d2_predl <- predict(d2_model, d1_test, type = "class")
+d2_predl_table <- table(d1_test$class, d2_predl)
+d2_predl_table
+
+sum(diag(d2_predl_table))/nrow(d1_test)
+```
+
+### ROC curves for the prediction models
+
+ROC curve is commonly used to visually represent the relationship between a model's true positive rate and false positive rate for all possible cutoff values. ROC curve is summarized into a single quantity known as area under the curve (AUC), which measures the entire two-dimensional area underneath the ROC curve from (0,0) to (1,1). The higher the AUC, the better the performance of the model at distinguishing between the positive and negative classes. As can be seen, the AUC for naive Bayes model is 0.841 while that for logistic regression model is 0.935. 
+
+```{r roc, warning=F, message=F, out.height="40%", fig.align='center'}
+nB_predl <- d2_predl %>% 
+  as.vector() %>%
+  as.numeric()
+
+par(pty="s") 
+ROC1 <- roc(d1_test$class ~ d1_predl, plot=TRUE, print.auc=TRUE, 
+               col="green", lwd =2, legacy.axes=TRUE,
+               main="ROC Curves for prediction models")
+
+ROC2 <- roc(d1_test$class ~ nB_predl, plot=TRUE, print.auc=TRUE,
+               col="blue", lwd = 2, print.auc.y=0.4, legacy.axes=TRUE, add = TRUE)
+
+legend("bottomright", legend=c("Logit Reg.","Naive Bayes"),
+       col=c("green","blue"), lwd=2)
+```
+
+\doublespacing
+\pagebreak
+## 5. Conclusion
+
+The capability to predict diabetes early assumes a vital role for the patient's appropriate treatment procedure. Machine learning methods are valuable in this early diagnosis of diabetes. In the current study, two machine learning techniques were applied on a training data set and validated against a test data set; both of these data sets were based on the data collected from the patients of Sylhet Diabetes Hospital in Sylhet, Bangladesh. The results of our model implementations show that based on both the measures of future performance - prediction accuracy and the AUC, the logistic regression classifier outperforms the naive Bayes classifier. One limitation of the current study is that it may only be valid on a similar data set as was used for this study, which was sourced from a very specific location. Further research is needed to check if similar results are seen for data collected elsewhere. 
+
+## 6. References
+\footnotesize
+1. World Health Organization 
+https://www.who.int/news-room/fact-sheets/detail/diabetes [accessed in June 2021]
+2. Islam M.M.F., Ferdousi R., Rahman S., Bushra H.Y. (2020) Likelihood Prediction of Diabetes at Early Stage Using Data Mining Techniques. In: Gupta M., Konar D., Bhattacharyya S., Biswas S. (eds) Computer Vision and Machine Intelligence in Medical Image Analysis. Advances in Intelligent Systems and Computing, vol 992. Springer, Singapore. https://doi.org/10.1007/978-981-13-8798-2_12
