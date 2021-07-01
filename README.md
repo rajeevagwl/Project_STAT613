@@ -2,7 +2,7 @@
 
 The current study builds prediction models using logistic regression and naive Bayes algorithms to predict the risk of diabetes at an early stage. For this study, the data set containing sign and symptom data of newly diabetic or would be diabetic patients collected by Sylhet Diabetes Hospital in Sylhet, Bangladesh, is used to build the prediction models.
 
-# References
+## References
 
 1. World Health Organization https://www.who.int/news-room/fact-sheets/detail/diabetes [accessed in
 June 2021]
