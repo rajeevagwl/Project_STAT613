@@ -1,6 +1,6 @@
 # Risk Prediction of Diabetes at Early Stage using Logistic Regression and Naive Bayes Algorithms
 
-The current study builds prediction models using logistic regression and naive Bayes algorithms to predict the risk of diabetes at an early stage. For this study, the data set containing sign and symptom data of newly diabetic or would be diabetic patients collected by Sylhet Diabetes Hospital in Sylhet, Bangladesh, is used to build the prediction models.
+The study builds prediction models using logistic regression and naive Bayes algorithms to predict the risk of diabetes at an early stage. For this study, the data set containing sign and symptom data of newly diabetic or would be diabetic patients collected by Sylhet Diabetes Hospital in Sylhet, Bangladesh, is used to build the prediction models.
 
 ## References
 
